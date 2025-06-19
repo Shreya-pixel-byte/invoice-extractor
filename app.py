@@ -17,6 +17,7 @@ Choose between automatic extraction or a custom column match.
 # Tabs for two modes
 tab1, tab2 = st.tabs(["📤 Upload Invoice", "📝 Custom Column Extractor"])
 
+# --------------------- TAB 1: Automatic Extraction ---------------------
 with tab1:
     st.subheader("Automatic Extraction")
     uploaded_file = st.file_uploader("Upload your invoice PDF", type=["pdf"])
@@ -88,6 +89,7 @@ with tab1:
             else:
                 st.warning("No matching invoice data found.")
 
+# --------------------- TAB 2: Custom Keyword Extraction ---------------------
 with tab2:
     st.subheader("Custom Column Extractor")
     st.write("Define keywords you'd like to extract from the invoice.")
@@ -103,18 +105,34 @@ with tab2:
             results = []
 
             with pdfplumber.open(custom_file) as pdf:
-                for page in pdf.pages:
+                for page_num, page in enumerate(pdf.pages, start=1):
                     lines = page.extract_text().split("\n")
                     for line in lines:
                         for kw in keywords:
                             if kw.lower() in line.lower():
-                                results.append({"Keyword": kw, "Line": line})
+                                results.append({
+                                    "Keyword": kw,
+                                    "Matched Line": line,
+                                    "Page": page_num
+                                })
 
             if results:
                 results_df = pd.DataFrame(results)
                 st.dataframe(results_df)
+
+                # Excel export
+                output_custom = BytesIO()
+                with pd.ExcelWriter(output_custom, engine='openpyxl') as writer:
+                    results_df.to_excel(writer, index=False, sheet_name='CustomMatches')
+                output_custom.seek(0)
+
+                st.download_button(
+                    label="📥 Download Matched Results as Excel",
+                    data=output_custom,
+                    file_name="custom_keyword_matches.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
             else:
                 st.info("No matching lines found for provided keywords.")
     elif extract_button:
         st.error("Please upload a PDF and enter at least one keyword.")
-
